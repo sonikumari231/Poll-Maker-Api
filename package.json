@@ -1,0 +1,20 @@
+{
+  "name": "poll-maker-lti13-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:frontend": "npm --prefix ../frontend run build",
+    "prestart": "npm run build:frontend",
+    "start": "node src/server.js",
+    "predev": "npm run build:frontend",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "jose": "^5.10.0"
+  }
+}
