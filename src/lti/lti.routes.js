@@ -930,7 +930,7 @@ router.post("/launch", async (req, res) => {
     );
 
     const target = messageType === DEEP_LINKING_REQUEST
-      ? new URL("/?deepLink=1", config.frontendUrl).toString()
+      ? new URL("/#/?deepLink=1", config.frontendUrl).toString()
       : req.session.targetLinkUri || `${config.frontendUrl}/`;
 
     req.session.targetLinkUri = null;
@@ -1045,7 +1045,7 @@ router.post("/deep-linking/respond", requireLtiSession, async (req, res, next) =
 
     const contentItems = selectedPolls.map((poll) => ({
       type: "ltiResourceLink",
-      url: new URL(`/poll/${encodeURIComponent(poll.id)}`, config.frontendUrl).toString(),
+      url: new URL(`/#/poll/${encodeURIComponent(poll.id)}`, config.frontendUrl).toString(),
       title: "Poll Maker",
     }));
     const responseClaims = {

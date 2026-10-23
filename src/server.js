@@ -1,8 +1,6 @@
 import express from "express";
 import cors from "cors";
 import session from "express-session";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { ensureToolKeys } from "./lti/keys.js";
 import ltiRoutes from "./lti/lti.routes.js";
@@ -10,9 +8,6 @@ import pollRoutes from "./poll/poll.routes.js";
 import { requireLtiSession } from "./auth/session.js";
 import authRoutes from "./auth/auth.routes.js";
 import { initializeDatabase } from "./storage.js";
-
-// const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// const frontendDist = path.join(__dirname, "../../frontend/dist");
 
 await ensureToolKeys();
 await initializeDatabase();
@@ -83,14 +78,6 @@ app.get("/api/lti/me", requireLtiSession, (req, res) => {
 app.use("/lti", ltiRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/polls", pollRoutes);
-
-// Serve the built React app
-// app.use(express.static(frontendDist));
-
-// Anything else (React Router routes) falls through to index.html
-// app.get(/^\/(?!api|lti).*/, (_req, res) => {
-//   res.sendFile(path.join(frontendDist, "index.html"));
-// });
 
 app.listen(config.port, () => {
   console.log(`Poll Maker backend running on http://localhost:${config.port}`);
