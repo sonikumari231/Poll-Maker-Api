@@ -41,6 +41,16 @@ export async function initializeDatabase() {
       position INTEGER NOT NULL,
       votes INTEGER NOT NULL DEFAULT 0 CHECK (votes >= 0)
     );
+
+    CREATE TABLE IF NOT EXISTS poll_votes (
+      poll_id UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+      voter_id TEXT NOT NULL,
+      option_id UUID NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
+      PRIMARY KEY (poll_id, voter_id)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS poll_votes_poll_voter_unique
+      ON poll_votes (poll_id, voter_id);
   `);
 }
 
@@ -120,6 +130,15 @@ export async function getPollById(id) {
   return polls.get(id) || null;
 }
 
+export async function hasVotedForPoll(pollId, voterId) {
+  if (!uuidPattern.test(pollId)) return false;
+  const result = await pool.query(
+    "SELECT 1 FROM poll_votes WHERE poll_id = $1 AND voter_id = $2",
+    [pollId, voterId],
+  );
+  return result.rowCount > 0;
+}
+
 export async function getPollsByIds(ids) {
   if (!ids.length) return [];
   if (ids.some((id) => !uuidPattern.test(id))) return ids.map(() => null);
@@ -130,7 +149,7 @@ export async function getPollsByIds(ids) {
   return ids.map((id) => polls.get(id) || null);
 }
 
-export async function voteForOption(pollId, optionId) {
+export async function voteForOption(pollId, optionId, voterId) {
   if (!uuidPattern.test(pollId)) {
     return { error: "poll_not_found", message: "Poll not found." };
   }
@@ -141,21 +160,38 @@ export async function voteForOption(pollId, optionId) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const updated = await client.query(
-      `UPDATE poll_options
-       SET votes = votes + 1
-       WHERE poll_id = $1 AND id = $2
-       RETURNING poll_id`,
+
+    const option = await client.query(
+      "SELECT 1 FROM poll_options WHERE poll_id = $1 AND id = $2",
       [pollId, optionId],
     );
-
-    if (!updated.rowCount) {
+    if (!option.rowCount) {
       const pollExists = await client.query("SELECT 1 FROM polls WHERE id = $1", [pollId]);
       await client.query("COMMIT");
       return pollExists.rowCount
         ? { error: "invalid_option", message: "That option does not belong to this poll." }
         : { error: "poll_not_found", message: "Poll not found." };
     }
+
+    const recorded = await client.query(
+      `INSERT INTO poll_votes (poll_id, voter_id, option_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (poll_id, voter_id) DO NOTHING
+       RETURNING poll_id`,
+      [pollId, voterId, optionId],
+    );
+    if (!recorded.rowCount) {
+      await client.query("COMMIT");
+      return {
+        error: "already_voted",
+        message: "You have already voted in this poll.",
+      };
+    }
+
+    await client.query(
+      "UPDATE poll_options SET votes = votes + 1 WHERE poll_id = $1 AND id = $2",
+      [pollId, optionId],
+    );
 
     const poll = await loadPollsWithClient(client, pollId);
     await client.query("COMMIT");

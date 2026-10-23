@@ -1,8 +1,22 @@
 import express from "express";
 import { requireUserSession } from "../auth/session.js";
-import { createId, createPoll, getPollById, voteForOption } from "../storage.js";
+import {
+  createId,
+  createPoll,
+  getPollById,
+  hasVotedForPoll,
+  voteForOption,
+} from "../storage.js";
 
 const router = express.Router();
+
+function getVoterId(session) {
+  if (session.user?.id) return `account:${session.user.id}`;
+  if (session.ltiUser?.issuer && session.ltiUser?.userId) {
+    return `lti:${session.ltiUser.issuer}:${session.ltiUser.userId}`;
+  }
+  return null;
+}
 
 function presentPoll(poll) {
   return {
@@ -45,27 +59,41 @@ router.get("/:id", async (req, res, next) => {
     if (!poll) {
       return res.status(404).json({ error: "poll_not_found", message: "Poll not found." });
     }
-    return res.json(presentPoll(poll));
+    const voterId = getVoterId(req.session);
+    const hasVoted = voterId ? await hasVotedForPoll(poll.id, voterId) : false;
+    return res.json({ ...presentPoll(poll), hasVoted });
   } catch (error) {
     return next(error);
   }
 });
 
-router.post("/:id/vote", async (req, res, next) => {
+router.post("/:id/vote", requireUserSession, async (req, res, next) => {
   const optionId = req.body?.optionId;
   if (typeof optionId !== "string" || !optionId) {
     return res.status(400).json({ error: "invalid_vote", message: "Select an option to vote." });
   }
+  const voterId = getVoterId(req.session);
+  if (!voterId) {
+    return res.status(401).json({
+      error: "authentication_required",
+      message: "Sign in before voting.",
+    });
+  }
 
   try {
-    const result = await voteForOption(req.params.id, optionId);
+    const result = await voteForOption(req.params.id, optionId, voterId);
     if (result.error) {
-      return res.status(result.error === "poll_not_found" ? 404 : 400).json({
+      const status = result.error === "poll_not_found"
+        ? 404
+        : result.error === "already_voted"
+          ? 409
+          : 400;
+      return res.status(status).json({
         error: result.error,
         message: result.message,
       });
     }
-    return res.json(presentPoll(result.poll));
+    return res.json({ ...presentPoll(result.poll), hasVoted: true });
   } catch (error) {
     return next(error);
   }
