@@ -6,7 +6,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 
 import { config } from "../config.js";
 
-import { getStore } from "../storage.js";
+import { getPollsByIds } from "../storage.js";
 import { requireLtiSession } from "../auth/session.js";
 import { getToolJwks, signDeepLinkingResponse } from "./keys.js";
 
@@ -1035,8 +1035,7 @@ router.post("/deep-linking/respond", requireLtiSession, async (req, res, next) =
   }
 
   try {
-    const store = await getStore();
-    const selectedPolls = pollIds.map((id) => store.polls.find((poll) => poll.id === id));
+    const selectedPolls = await getPollsByIds(pollIds);
     if (selectedPolls.some((poll) => !poll)) {
       return res.status(400).json({
         error: "poll_not_found",

@@ -9,11 +9,13 @@ import ltiRoutes from "./lti/lti.routes.js";
 import pollRoutes from "./poll/poll.routes.js";
 import { requireLtiSession } from "./auth/session.js";
 import authRoutes from "./auth/auth.routes.js";
+import { initializeDatabase } from "./storage.js";
 
 // const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // const frontendDist = path.join(__dirname, "../../frontend/dist");
 
 await ensureToolKeys();
+await initializeDatabase();
 
 const app = express();
 

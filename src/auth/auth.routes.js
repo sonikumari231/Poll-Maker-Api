@@ -1,7 +1,7 @@
 import { promisify } from "node:util";
 import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import express from "express";
-import { getStore, updateStore } from "../storage.js";
+import { createUser, getUserByEmail } from "../storage.js";
 
 const router = express.Router();
 const scrypt = promisify(scryptCallback);
@@ -45,18 +45,11 @@ router.post("/register", async (req, res, next) => {
 
   try {
     const credentials = await hashPassword(password);
-    const user = await updateStore((store) => {
-      if (store.users.some((account) => account.email === email)) {
-        return null;
-      }
-      const account = {
-        id: randomUUID(),
-        email,
-        salt: credentials.salt,
-        passwordHash: credentials.hash,
-      };
-      store.users.push(account);
-      return account;
+    const user = await createUser({
+      id: randomUUID(),
+      email,
+      salt: credentials.salt,
+      passwordHash: credentials.hash,
     });
 
     if (!user) {
@@ -81,7 +74,7 @@ router.post("/login", async (req, res, next) => {
   }
 
   try {
-    const user = (await getStore()).users.find((account) => account.email === email);
+    const user = await getUserByEmail(email);
     if (!user || !(await passwordMatches(password, user))) {
       return res.status(401).json({ error: "invalid_credentials", message: "Email or password is incorrect." });
     }

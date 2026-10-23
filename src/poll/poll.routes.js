@@ -1,6 +1,6 @@
 import express from "express";
 import { requireUserSession } from "../auth/session.js";
-import { createId, getStore, updateStore } from "../storage.js";
+import { createId, createPoll, getPollById, voteForOption } from "../storage.js";
 
 const router = express.Router();
 
@@ -32,7 +32,7 @@ router.post("/", requireUserSession, async (req, res, next) => {
       options: options.map((text) => ({ id: createId(), text, votes: 0 })),
       createdBy: req.session.user?.id || req.session.ltiUser?.userId || null,
     };
-    await updateStore((store) => store.polls.push(poll));
+    await createPoll(poll);
     return res.status(201).json(presentPoll(poll));
   } catch (error) {
     return next(error);
@@ -41,7 +41,7 @@ router.post("/", requireUserSession, async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const poll = (await getStore()).polls.find((item) => item.id === req.params.id);
+    const poll = await getPollById(req.params.id);
     if (!poll) {
       return res.status(404).json({ error: "poll_not_found", message: "Poll not found." });
     }
@@ -58,21 +58,14 @@ router.post("/:id/vote", async (req, res, next) => {
   }
 
   try {
-    const result = await updateStore((store) => {
-      const poll = store.polls.find((item) => item.id === req.params.id);
-      if (!poll) return { status: 404, error: "poll_not_found", message: "Poll not found." };
-      const option = poll.options.find((item) => item.id === optionId);
-      if (!option) return { status: 400, error: "invalid_option", message: "That option does not belong to this poll." };
-      option.votes += 1;
-      return { status: 200, poll: presentPoll(poll) };
-    });
+    const result = await voteForOption(req.params.id, optionId);
     if (result.error) {
-      return res.status(result.status).json({
+      return res.status(result.error === "poll_not_found" ? 404 : 400).json({
         error: result.error,
         message: result.message,
       });
     }
-    return res.json(result.poll);
+    return res.json(presentPoll(result.poll));
   } catch (error) {
     return next(error);
   }
