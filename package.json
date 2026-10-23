@@ -4,10 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:frontend": "npm --prefix ../frontend run build",
-    "prestart": "npm run build:frontend",
     "start": "node src/server.js",
-    "predev": "npm run build:frontend",
     "dev": "node --watch src/server.js"
   },
   "dependencies": {
